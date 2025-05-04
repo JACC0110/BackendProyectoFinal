@@ -1,0 +1,50 @@
+--Creacion de Tabla
+CREATE SEQUENCE my_friends_id_seq START WITH 1 INCREMENT BY 1;
+
+CREATE TABLE my_friends (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    gender VARCHAR(50) NOT NULL
+);
+
+ALTER SEQUENCE my_friends_id_seq OWNED BY my_friends.id;
+
+---Insertar datos
+INSERT INTO my_friends (id, name, gender) VALUES (1, 'Rigoberto', 'M');
+
+--Buscar datos
+select* from my_friends
+
+--Actualizar
+UPDATE my_friends SET name = 'jesús' WHERE name = 'Jesús';
+
+--Trigger
+CREATE OR REPLACE FUNCTION public.notify_my_friend_update()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  old_name TEXT;
+BEGIN
+  old_name := OLD.name;
+
+  PERFORM pg_notify('my_friend_update', 
+    json_build_object(
+      'operation', TG_OP,
+      'id', NEW.id,
+      'name', NEW.name,
+      'gender', NEW.gender,
+      'tableName', TG_TABLE_NAME,
+      'oldName', old_name,
+      'newName', NEW.name
+    )::text
+  );
+
+  RETURN NEW;
+END;
+$function$
+
+CREATE TRIGGER my_friend_update_trigger
+AFTER UPDATE ON my_friends
+FOR EACH ROW
+EXECUTE FUNCTION notify_my_friend_update();
